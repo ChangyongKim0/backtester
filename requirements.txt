@@ -1,0 +1,19 @@
+beautifulsoup4 @ file:///tmp/build/80754af9/beautifulsoup4_1631874778482/work
+brotlipy==0.7.0
+certifi==2021.5.30
+cffi @ file:///D:/bld/cffi_1631636428553/work
+cryptography @ file:///D:/bld/cryptography_1616851687511/work
+et-xmlfile==1.1.0
+idna @ file:///home/conda/feedstock_root/build_artifacts/idna_1609836280497/work
+jdcal @ file:///Users/ktietz/demo/mc3/conda-bld/jdcal_1630584345063/work
+openpyxl @ file:///tmp/build/80754af9/openpyxl_1615411699337/work
+pycparser @ file:///home/conda/feedstock_root/build_artifacts/pycparser_1593275161868/work
+pyOpenSSL @ file:///home/conda/feedstock_root/build_artifacts/pyopenssl_1608055815057/work
+PySocks @ file:///D:/bld/pysocks_1610291658292/work
+selenium @ file:///D:/bld/selenium_1610664683097/work
+six @ file:///home/conda/feedstock_root/build_artifacts/six_1620240208055/work
+soupsieve @ file:///tmp/build/80754af9/soupsieve_1616183228191/work
+urllib3 @ file:///home/conda/feedstock_root/build_artifacts/urllib3_1624634538755/work
+win-inet-pton @ file:///D:/bld/win_inet_pton_1610147627696/work
+wincertstore==0.2
+xlrd @ file:///tmp/build/80754af9/xlrd_1608072521494/work
