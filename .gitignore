@@ -14,3 +14,6 @@ data/price
 kw
 
 *.ipynb
+
+# 보안상 아직 안올림
+/xing_login.py
