@@ -12,3 +12,8 @@ data/price
 
 /financial
 kw
+
+*.ipynb
+
+# 보안상 아직 올리지 않음
+xing_login.py
