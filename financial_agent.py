@@ -127,6 +127,8 @@ class FinancialAgent:
             data = string.split('/')[0]
         elif type == "quarter":
             temp = string.split('/')
+            if len(string) == 0:
+                return ''
             data = temp[0] + temp[1].split('(')[0]
         if 'E' in string:
             return data + 'E'
@@ -189,7 +191,7 @@ class FinancialAgent:
         year_latest_updated = False
         is_year = False
         for idx, year in enumerate(year_list):
-            if year not in dict_input['financial_info'].keys():
+            if year not in dict_input['financial_info'].keys() and len(year) != 0:
                 dict_input['financial_info'][year] = {}
             if year_latest_updated:
                 continue
@@ -210,8 +212,9 @@ class FinancialAgent:
             th_keylist.append(self._translator(removeEmpty(th_list[0].text)))
             td_list = tr_item.select('td')  # value값들
             for td_idx in range(len(td_list)):
-                dict_input['financial_info'][year_list[td_idx]
-                                             ][th_keylist[-1]] = self._getValueByUnitType(td_list[td_idx].text, self.financial_info_value_type[tr_idx])
+                if len(year_list[td_idx]) != 0:
+                    dict_input['financial_info'][year_list[td_idx]
+                                                 ][th_keylist[-1]] = self._getValueByUnitType(td_list[td_idx].text, self.financial_info_value_type[tr_idx])
         return True, dict_input
 
     def _int(self, text):
@@ -403,12 +406,12 @@ class FinancialAgent:
 
 if __name__ == "__main__":
     financial_agent = FinancialAgent()
-    financial_agent.filter('000020', prev_echo=False)
-    financial_agent.filter('089860', prev_echo=False)
-    financial_agent.filter('038000', prev_echo=False)
-    financial_agent.filter('038110', prev_echo=False)
-    financial_agent.filter('000020', prev_echo=False)
-    financial_agent.filter('093230', prev_echo=False)
+    # financial_agent.filter('000020', prev_echo=False)
+    # financial_agent.filter('089860', prev_echo=False)
+    # financial_agent.filter('038000', prev_echo=False)
+    # financial_agent.filter('038110', prev_echo=False)
+    # financial_agent.filter('000020', prev_echo=False)
+    financial_agent.filter('375500', prev_echo=False)
     # financial_agent.crawl('000030')
     # financial_agent.crawl('089860')
     # financial_agent.crawl('038110')

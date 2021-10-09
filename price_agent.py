@@ -112,7 +112,7 @@ if __name__ == '__main__':
     price_agent = PriceAgent()
     data = price_agent._create('035720', '20210801', '20210805')
     time.sleep(3)
-    data3 = price_agent._create('078020', '20210801', '20210806')
+    data3 = price_agent._create('078020', '20160701', '20210806')
     # print(data)
     time.sleep(3)
     data2 = price_agent._update('035720', data)
