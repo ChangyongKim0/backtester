@@ -69,17 +69,26 @@ class FinancialAgent:
                         "독립전력생산및에너지거래"]
 
     def __init__(self, echo=True, echo_error=True):
+        self.jongmok_code = ""
+        self.access_url = ""
         self.echo = echo
         self.echo_error = echo_error
         self.save_dir = f'{BASE_DIR}/data/financial'
         if not os.path.isdir(self.save_dir):
             os.makedirs(self.save_dir)
         self.save_code_list_path = f'{self.save_dir}/jongmok_code_list.json'
+        self.log_path = f'{self.save_dir}/financial_filter_log.json'
         if not os.path.isfile(self.save_code_list_path):
-            self.errlog("sldkalafk")
+            self.log("create new jongmok code list file.")
             with open(self.save_code_list_path, "w", encoding='utf-8') as json_file:
                 json.dump({"create_date": datetime.date.today().strftime(
                     "%Y%m%d")}, json_file, indent=4, ensure_ascii=False)
+        if not os.path.isfile(self.log_path):
+            self.log("create new log file.")
+            with open(self.log_path, "w", encoding='utf-8') as json_log_file:
+                json.dump({"create_date": datetime.date.today().strftime(
+                    "%Y%m%d"), "log": []}, json_log_file,
+                    indent=4, ensure_ascii=False)
 
         options = webdriver.ChromeOptions()
         options.add_argument('headless')
@@ -96,16 +105,28 @@ class FinancialAgent:
         if self.echo_error:
             print('FinancialAgent> \033[91m{}\033[0m'.format(content))
 
-    def _getPageSource(self, jongmok_code, type="wisereport"):
+    def _writeFinancialLog(self, state=404, err_type="NORMAL", err_detail={}):
+        if err_type in ["INVALID_VAL", "INVALID_VAL_INT", "INVALID_VAL_FLOAT", "MISSING_VAL", ]:
+            return -1
+        # state: 1(BUY) / 0(DELAY) / -1(DO NOT BUY) / 404(FAIL)
+        # err_type: NORMAL / INVALID_CODE / UNKNOWN_ERR / INVALID_VAL / INVALID_VAL_INT / INVALID_VAL_FLOAT / MISSING_INFO / MISSING_VAL / MISSING_DATA
+        with open(self.log_path, "r", encoding='utf-8') as json_file:
+            json_data = json.load(json_file)
+        json_data["log"].append({"date": datetime.date.today().strftime(
+            "%Y%m%d"), "jongmok_code": self.jongmok_code, "access_url": self.access_url, "state": state, "err_type": err_type, "err_detail": err_detail})
+        with open(self.log_path, "w", encoding='utf-8') as json_file:
+            json.dump(json_data, json_file, indent=4, ensure_ascii=False)
+
+    def _getPageSource(self, type="wisereport"):
         if (type == 'wisereport') or (type == 'quarter'):
-            url = f'https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={jongmok_code}'
+            self.access_url = f'https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={self.jongmok_code}'
         elif type == 'financial':
-            url = f'https://finance.naver.com/item/coinfo.naver?code={jongmok_code}'
+            self.access_url = f'https://finance.naver.com/item/coinfo.naver?code={self.jongmok_code}'
         self.log('getting page source.')
-        self.log('target url : {}'.format(url))
+        self.log('target url : {}'.format(self.access_url))
         try:
             time.sleep(1)
-            self.driver.get(url)
+            self.driver.get(self.access_url)
             self.driver.implicitly_wait(1)
             if type == 'wisereport':
                 self.driver.find_element_by_id('cns_td21').click()
@@ -115,9 +136,13 @@ class FinancialAgent:
             return True, page
         except Exception as e:
             if "올바른 종목이 아닙니다" in e.args[0]:
+                self._writeFinancialLog(
+                    err_type="INVALID_CODE", err_detail={"args": e.args})
                 self.errlog('invalid jongmok code.')
                 self.errlog(e.args[0])
             else:
+                self._writeFinancialLog(
+                    err_type="UNKNOWN_ERR", err_detail={"args": e.args})
                 self.errlog('unknown error occured.')
                 self.errlog(e.args[0])
             return False, ""
@@ -163,14 +188,14 @@ class FinancialAgent:
         return path + '\\' + recent_file[0]
 
     '''
-    def _updateFinancial(self, jongmok_code, dict_input, type="year"):
+    def _updateFinancial(self, dict_input, type="year"):
         # if 'year_latest' in dict_input.keys():
         #     if dict_input['year_latest']+1 >= datetime.date.today().year:
         #         return False, dict_input
         if type == "year":
-            result, page = self._getPageSource(jongmok_code)
+            result, page = self._getPageSource(self.jongmok_code)
         elif type == "quarter":
-            result, page = self._getPageSource(jongmok_code, "quarter")
+            result, page = self._getPageSource(self.jongmok_code, "quarter")
 
         if result == False:
             return False, dict_input
@@ -189,7 +214,7 @@ class FinancialAgent:
         jongmok_name = soup.select('span.name')[0].text
         corp_WICS = removeEmpty(soup.select('td.td0101')[0].select(
             'dt.line-left')[2].text.split(':')[1])
-        dict_input['jongmok_code'] = jongmok_code
+        dict_input['jongmok_code'] = self.jongmok_code
         dict_input['jongmok_name'] = jongmok_name
         dict_input['corp_WICS'] = corp_WICS
         if 'financial_info' not in dict_input.keys():
@@ -238,14 +263,14 @@ class FinancialAgent:
         return True, dict_input
     '''
 
-    def _updateFinancial(self, jongmok_code, dict_input, type="year"):
+    def _updateFinancial(self, dict_input, type="year"):
         # if 'year_latest' in dict_input.keys():
         #     if dict_input['year_latest']+1 >= datetime.date.today().year:
         #         return False, dict_input
         if type == "year":
-            result, page = self._getPageSource(jongmok_code)
+            result, page = self._getPageSource()
         elif type == "quarter":
-            result, page = self._getPageSource(jongmok_code, "quarter")
+            result, page = self._getPageSource("quarter")
 
         if result == False:
             return False, dict_input
@@ -264,7 +289,7 @@ class FinancialAgent:
         jongmok_name = soup.select('span.name')[0].text
         corp_WICS = removeEmpty(soup.select('td.td0101')[0].select(
             'dt.line-left')[2].text.split(':')[1])
-        dict_input['jongmok_code'] = jongmok_code
+        dict_input['jongmok_code'] = self.jongmok_code
         dict_input['jongmok_name'] = jongmok_name
         dict_input['corp_WICS'] = corp_WICS
         if 'financial_info' not in dict_input.keys():
@@ -314,6 +339,8 @@ class FinancialAgent:
         try:
             return int(''.join(text.split(',')))
         except:
+            self._writeFinancialLog(
+                err_type="INVALID_VAL_INT", err_detail={"value": text})
             self.errlog("cannot convert to integer.(TEXT: {})".format(text))
             return -1
 
@@ -321,6 +348,8 @@ class FinancialAgent:
         try:
             return float(''.join(text.split(',')))
         except:
+            self._writeFinancialLog(
+                err_type="INVALID_VAL_FLOAT", err_detail={"value": text})
             self.errlog("cannot convert to float.(TEXT: {})".format(text))
             return -1.0
 
@@ -361,16 +390,20 @@ class FinancialAgent:
                     return -1 * val/100
                 return val/100
             else:
+                self._writeFinancialLog(
+                    err_type="INVALID_VAL", err_detail={"value": text, "unit_type": unit_type})
                 self.errlog("wrong unit type.(TYPE: {})".format(unit_type))
                 return -1
         except:
+            self._writeFinancialLog(
+                err_type="INVALID_VAL", err_detail={"value": text, "unit_type": unit_type})
             return -1
 
-    def _updateInvestFinancial(self, jongmok_code, dict_input):
+    def _updateInvestFinancial(self, dict_input):
         # if 'year_latest' in dict_input.keys():
         #     if dict_input['year_latest']+1 >= datetime.date.today().year:
         #         return False, dict_input
-        result, page = self._getPageSource(jongmok_code, 'financial')
+        result, page = self._getPageSource('financial')
         if result == False:
             return False, dict_input
 
@@ -397,8 +430,10 @@ class FinancialAgent:
                     key_list.append(self.invest_info_keys_eng[key_index])
                 else:
                     key_list.append('')
+                    self._writeFinancialLog(
+                        err_type="MISSING_INFO", err_detail={"key": self.invest_info_keys_eng[key_index]})
                     self.errlog("missing investment info.(CODE: {})(KEY: {})".format(
-                        jongmok_code, self.invest_info_keys_eng[key_index]))
+                        self.jongmok_code, self.invest_info_keys_eng[key_index]))
                 key_index += 1
 
         val_index = 0
@@ -409,8 +444,10 @@ class FinancialAgent:
                 val = self._getValueByUnitType(
                     atom, self.invest_info_value_type[val_index])
                 if val == -1:
+                    self._writeFinancialLog(
+                        err_type="MISSING_VAL", err_detail={"key": key_list[val_index]})
                     self.errlog("missing investment info value.(CODE: {})(KEY: {})".format(
-                        jongmok_code, key_list[val_index]))
+                        self.jongmok_code, key_list[val_index]))
                 val_list.append(val)
                 val_index += 1
 
@@ -421,48 +458,53 @@ class FinancialAgent:
 
         return True, dict_input
 
-    def crawl(self, jongmok_code):
-        save_name = f'{self.save_dir}/{jongmok_code}.json'
+    def crawl(self):
+        save_name = f'{self.save_dir}/{self.jongmok_code}.json'
         if os.path.isfile(save_name):
             with open(save_name, "r", encoding='utf-8') as json_file:
                 dict_input = json.load(json_file)
             self.log(
-                "found previous financial data.(CODE: {})".format(jongmok_code))
+                "found previous financial data.(CODE: {})".format(self.jongmok_code))
             val0 = True
         else:
             dict_input = {}
             val0 = False
-        val, dict = self._updateFinancial(jongmok_code, dict_input, "year")
-        _, dict = self._updateFinancial(jongmok_code, dict, "quarter")
-        val2, dict = self._updateInvestFinancial(jongmok_code, dict)
+        val, dict = self._updateFinancial(dict_input, "year")
+        _, dict = self._updateFinancial(dict, "quarter")
+        val2, dict = self._updateInvestFinancial(dict)
         if val or val2:
             with open(save_name, "w", encoding='utf-8') as json_file:
                 json.dump(dict, json_file, indent=4, ensure_ascii=False)
             with open(self.save_code_list_path, 'r', encoding='utf-8') as json_file:
                 dict_list = json.load(json_file)
-            if jongmok_code not in dict_list.keys():
-                dict_list[jongmok_code] = []
-            dict_list[jongmok_code].append(
+            if self.jongmok_code not in dict_list.keys():
+                dict_list[self.jongmok_code] = []
+            dict_list[self.jongmok_code].append(
                 datetime.date.today().strftime("%Y/%m/%d"))
             with open(self.save_code_list_path, 'w', encoding='utf-8') as json_file:
                 json.dump(dict_list, json_file, indent=4, ensure_ascii=False)
-            self.log('saved financial data.(CODE: {})'.format(jongmok_code))
+            self.log('saved financial data.(CODE: {})'.format(self.jongmok_code))
             return True
         else:
+            self._writeFinancialLog(
+                err_type="MISSING_DATA")
             self.errlog(
-                'error occured while getting new financial data.(CODE: {})'.format(jongmok_code))
+                'error occured while getting new financial data.(CODE: {})'.format(self.jongmok_code))
             return val0
 
-    def get(self, jongmok_code):
-        save_name = f'{self.save_dir}/{jongmok_code}.json'
+    def get(self):
+        save_name = f'{self.save_dir}/{self.jongmok_code}.json'
         if os.path.isfile(save_name):
             with open(save_name, "r", encoding='utf-8') as json_file:
                 json_data = json.load(json_file)
-            self.log('getting saved financial data.(CODE: {})'.format(jongmok_code))
+            self.log('getting saved financial data.(CODE: {})'.format(
+                self.jongmok_code))
             return json_data
         else:
+            self._writeFinancialLog(
+                err_type="MISSING_DATA_SAVED")
             self.errlog(
-                'there is no saved financial data.(CODE: {})'.format(jongmok_code))
+                'there is no saved financial data.(CODE: {})'.format(self.jongmok_code))
             return -1
 
     def _quarterFilter(self, data):
@@ -481,37 +523,34 @@ class FinancialAgent:
         return data['corp_WICS'] in self.corp_filter_list
 
     def filter(self, jongmok_code, prev_echo=False):
+        self.jongmok_code = jongmok_code
         self.echo = prev_echo
-        self.crawl(jongmok_code)
-        data = self.get(jongmok_code)
+        self.crawl()
+        data = self.get()
         if data == -1:
-            return False
+            self._writeFinancialLog(state=-1, err_type="NORMAL")
+            return {"state": -1, "data": {}}  # 매수 거부
         # self.echo = True
-        self.log("investigate financial data.(CODE: {})".format(jongmok_code))
+        self.log("investigate financial data.(CODE: {})".format(self.jongmok_code))
         val = self._quarterFilter(data)
         val2 = self._corpFilter(data)
+        callback_data = {"corp_WICS": data["corp_WICS"], **
+                         data['financial_info'][str(data['quarter_latest'])]}
         if val and val2:
+            self._writeFinancialLog(state=1, err_type="NORMAL")
             self.log("investable jongmok code.")
+            return {"state": 1, "data": callback_data}  # 매수 및 기록
         else:
-            self.errlog("uninvestable jongmok code.")
-        return val and val2
+            self._writeFinancialLog(state=-1, err_type="NORMAL")
+            self.log("uninvestable jongmok code.")
+            return {"state": -1, "data": {}}  # 매수 거부
 
 
 if __name__ == "__main__":
-    financial_agent = FinancialAgent()
-    financial_agent.filter('000020', prev_echo=False)
-    financial_agent.filter('089860', prev_echo=False)
+    financial_agent = FinancialAgent(echo=False, echo_error=False)
+    print(financial_agent.filter('000020', prev_echo=False))
+    print(financial_agent.filter('089860', prev_echo=False))
     financial_agent.filter('038000', prev_echo=False)
     financial_agent.filter('038110', prev_echo=False)
     financial_agent.filter('000020', prev_echo=False)
     financial_agent.filter('093230', prev_echo=False)
-    # financial_agent.crawl('000030')
-    # financial_agent.crawl('089860')
-    # financial_agent.crawl('038110')
-    # financial_agent.crawl('222080')
-    # financial_agent.crawl('000020')
-    # financial_agent.crawl('093230')
-    # financial_agent.get('000030')
-    # print(financial_agent.get('005930'))
-    # print(financial_agent._getPageSource('005930', 'wisereport'))
-    # print(financial_agent._updateDailyFinancial('089860', {}))
