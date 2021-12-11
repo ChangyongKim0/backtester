@@ -24,6 +24,8 @@ import sys
 import re
 import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # 입력값
 filepath_financial = 'financial'
 error_code_list = []
@@ -69,8 +71,9 @@ class FinancialAgent:
     def __init__(self, echo=True, echo_error=True):
         self.echo = echo
         self.echo_error = echo_error
-        self.save_dir = '{}/data/financial'.format(
-            os.path.abspath(__file__+"/.."))
+        self.save_dir = f'{BASE_DIR}/data/financial'
+        if not os.path.isdir(self.save_dir):
+            os.makedirs(self.save_dir)
         self.save_code_list_path = f'{self.save_dir}/jongmok_code_list.json'
         if not os.path.isfile(self.save_code_list_path):
             self.errlog("sldkalafk")
@@ -122,6 +125,19 @@ class FinancialAgent:
     def _translator(self, name):
         return self.financial_info_keys_eng[self.financial_info_keys_kor.index(name)]
 
+    '''
+    def _yearMonthMaker(self, string, type="year"):
+        if type == "year":
+            data = string.split('/')[0]
+        elif type == "quarter":
+            temp = string.split('/')
+            data = temp[0] + temp[1].split('(')[0]
+        if 'E' in string:
+            return data + 'E'
+        else:
+            return data
+    '''
+
     def _yearMonthMaker(self, string, type="year"):
         if type == "year":
             data = string.split('/')[0]
@@ -130,6 +146,7 @@ class FinancialAgent:
             if len(string) == 0:
                 return ''
             data = temp[0] + temp[1].split('(')[0]
+
         if 'E' in string:
             return data + 'E'
         else:
@@ -144,6 +161,82 @@ class FinancialAgent:
             file_name_and_time_list, key=lambda x: x[1], reverse=True)
         recent_file = sorted_file_list[0]
         return path + '\\' + recent_file[0]
+
+    '''
+    def _updateFinancial(self, jongmok_code, dict_input, type="year"):
+        # if 'year_latest' in dict_input.keys():
+        #     if dict_input['year_latest']+1 >= datetime.date.today().year:
+        #         return False, dict_input
+        if type == "year":
+            result, page = self._getPageSource(jongmok_code)
+        elif type == "quarter":
+            result, page = self._getPageSource(jongmok_code, "quarter")
+
+        if result == False:
+            return False, dict_input
+
+        soup = BeautifulSoup(page, 'html.parser')
+        table_list = soup.select('table.gHead01')
+        table_item = None
+        for table in table_list:
+            caption = removeEmpty(table.select('caption.blind')[0].text)
+            if "주요재무정보" == caption:
+                table_item = table
+                break
+        if table_item is None:
+            return False, dict_input
+
+        jongmok_name = soup.select('span.name')[0].text
+        corp_WICS = removeEmpty(soup.select('td.td0101')[0].select(
+            'dt.line-left')[2].text.split(':')[1])
+        dict_input['jongmok_code'] = jongmok_code
+        dict_input['jongmok_name'] = jongmok_name
+        dict_input['corp_WICS'] = corp_WICS
+        if 'financial_info' not in dict_input.keys():
+            dict_input['financial_info'] = {}
+
+        tr_list = table_item.select('thead > tr')  # 표의 제목 부분
+        year_list = []
+        for tr_idx, tr_item in enumerate(tr_list):
+            th_list = tr_item.select('th')
+            if tr_idx == 0:
+                continue
+            else:
+                for th_idx in range(len(th_list)):
+                    try:
+                        year_list.append(self._yearMonthMaker(
+                            removeEmpty(th_list[th_idx].text), type))
+                    except:
+                        continue
+
+        year_latest_updated = False
+        is_year = False
+        for idx, year in enumerate(year_list):
+            if year not in dict_input['financial_info'].keys():
+                dict_input['financial_info'][year] = {}
+            if year_latest_updated:
+                continue
+            elif 'E' in year:
+                year_latest_updated = True
+                year_latest = year_list[idx - 1]
+                is_year = True
+
+        if is_year:
+            dict_input[type + '_latest'] = int(year_latest)
+        else:
+            dict_input[type + '_latest'] = -1
+
+        tr_list = table_item.select('tbody > tr')  # 표의 내용 부분
+        th_keylist = []
+        for tr_idx, tr_item in enumerate(tr_list):
+            th_list = tr_item.select('th')  # key값들
+            th_keylist.append(self._translator(removeEmpty(th_list[0].text)))
+            td_list = tr_item.select('td')  # value값들
+            for td_idx in range(len(td_list)):
+                dict_input['financial_info'][year_list[td_idx]
+                                             ][th_keylist[-1]] = self._getValueByUnitType(td_list[td_idx].text, self.financial_info_value_type[tr_idx])
+        return True, dict_input
+    '''
 
     def _updateFinancial(self, jongmok_code, dict_input, type="year"):
         # if 'year_latest' in dict_input.keys():
@@ -393,7 +486,7 @@ class FinancialAgent:
         data = self.get(jongmok_code)
         if data == -1:
             return False
-        self.echo = True
+        # self.echo = True
         self.log("investigate financial data.(CODE: {})".format(jongmok_code))
         val = self._quarterFilter(data)
         val2 = self._corpFilter(data)
@@ -406,12 +499,12 @@ class FinancialAgent:
 
 if __name__ == "__main__":
     financial_agent = FinancialAgent()
-    # financial_agent.filter('000020', prev_echo=False)
-    # financial_agent.filter('089860', prev_echo=False)
-    # financial_agent.filter('038000', prev_echo=False)
-    # financial_agent.filter('038110', prev_echo=False)
-    # financial_agent.filter('000020', prev_echo=False)
-    financial_agent.filter('375500', prev_echo=False)
+    financial_agent.filter('000020', prev_echo=False)
+    financial_agent.filter('089860', prev_echo=False)
+    financial_agent.filter('038000', prev_echo=False)
+    financial_agent.filter('038110', prev_echo=False)
+    financial_agent.filter('000020', prev_echo=False)
+    financial_agent.filter('093230', prev_echo=False)
     # financial_agent.crawl('000030')
     # financial_agent.crawl('089860')
     # financial_agent.crawl('038110')
